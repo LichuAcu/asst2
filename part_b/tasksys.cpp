@@ -159,7 +159,7 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable *runnabl
     std::lock_guard<std::mutex> lock(waiting_mutex);
     int bulk_id = bulks.size();
     Bulk bulk{runnable, deps, num_total_tasks, 0, bulk_id, false};
-    bulk_mutexes.emplace_back();
+    bulk_mutexes.push_back(std::unique_ptr<std::mutex>(new std::mutex()));
     bulks.push_back(bulk);
     waiting.insert(&bulks.back());
 

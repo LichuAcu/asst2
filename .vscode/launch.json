@@ -10,7 +10,27 @@
       "cwd": "${workspaceFolder}/part_b",
       "environment": [],
       "externalConsole": false,
-      "MIMode": "lldb"
+      "MIMode": "lldb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for lldb",
+          "text": "settings set target.process.thread.step-avoid-regexp ''",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set Disassembly Flavor to Intel",
+          "text": "settings set target.x86-disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "label": "generate core dump",
+      "type": "shell",
+      "command": "ulimit -c unlimited && ${workspaceFolder}/part_b/runtasks -n 8 super_super_light_async",
+      "problemMatcher": []
     }
   ]
 }
