@@ -139,10 +139,9 @@ void TaskSystemParallelThreadPoolSpinning::thread_func()
             task.runnable->runTask(task.task_id, task.num_total_tasks);
 
             {
-                std::lock_guard<std::mutex> lock(bulk_counter_mutex);
-                if (--tasks_left_in_bulk[task.bulk_id] == 0)
+                if (--tasks_left == 0)
                 {
-                    bulk_completed[task.bulk_id] = true;
+                    bulk_completed = true;
                 }
             }
         }
@@ -161,7 +160,6 @@ TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int n
     {
         thread_pool.push_back(std::thread(&TaskSystemParallelThreadPoolSpinning::thread_func, this));
     }
-    bulk_counter.store(0);
 }
 
 TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning()
@@ -180,28 +178,20 @@ void TaskSystemParallelThreadPoolSpinning::run(IRunnable *runnable, int num_tota
     // method in Part A.  The implementation provided below runs all
     // tasks sequentially on the calling thread.
     //
-
-    int bulk_id = bulk_counter.fetch_add(1);
-    {
-        std::lock_guard<std::mutex> lock(bulk_counter_mutex);
-        tasks_left_in_bulk[bulk_id] = num_total_tasks;
-        bulk_completed[bulk_id] = false;
-    }
+    tasks_left = num_total_tasks;
+    bulk_completed = false;
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
         for (int i = 0; i < num_total_tasks; i++)
         {
-            task_queue.push(Task{runnable, i, num_total_tasks, bulk_id});
+            task_queue.push(Task{runnable, i, num_total_tasks});
         }
     }
     while (true)
     {
+        if (bulk_completed)
         {
-            std::lock_guard<std::mutex> lock(bulk_counter_mutex);
-            if (bulk_completed[bulk_id])
-            {
-                break;
-            }
+            break;
         }
     }
 }

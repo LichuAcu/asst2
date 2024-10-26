@@ -47,7 +47,6 @@ struct Task
     IRunnable *runnable;
     int task_id;
     int num_total_tasks;
-    int bulk_id;
 };
 
 /*
@@ -64,15 +63,10 @@ private:
     std::mutex queue_mutex;
     std::queue<Task> task_queue;
 
-    std::mutex bulk_counter_mutex;
-    std::atomic<int> bulk_counter;
-    // std::unordered_map<int, int> tasks_left_in_bulk;
-    // std::unordered_map<int, bool> bulk_completed;
-
     void thread_func();
 
-    std::unordered_map<int, std::atomic<int>> tasks_left_in_bulk;
-    std::unordered_map<int, std::atomic<bool>> bulk_completed;
+    std::atomic<int> tasks_left;
+    std::atomic<bool> bulk_completed;
 
     bool terminate;
 
