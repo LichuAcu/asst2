@@ -93,12 +93,11 @@ private:
     // std::vector<std::vector<int>> dependants; // dependants[i] is the bulks that depend on bulk i
     // std::vector<std::set<int>> dependencies;  // dependencies[i] is the bulks that bulk i depends on
 
-    std::vector<std::mutex> bulk_mutexes; // bulk_mutexes[i] is the lock for bulk i
-
     // std::vector<std::condition_variable> cvs; // cvs[i] is the cv for bulk i
     std::vector<Bulk> bulks;
-    std::set<Bulk *> waiting; // bulks that are waiting for completion of their dependencies
-    std::mutex waiting_mutex; // waiting_mutex is the lock for the waiting set
+    std::vector<std::unique_ptr<std::mutex>> bulk_mutexes; // bulk_mutexes[i] is the lock for bulk i
+    std::set<Bulk *> waiting;                              // bulks that are waiting for completion of their dependencies
+    std::mutex waiting_mutex;                              // waiting_mutex is the lock for the waiting set
 
     std::condition_variable bulk_finished_cv;
 

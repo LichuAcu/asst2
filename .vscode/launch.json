@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run runtasks part b",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/part_b/runtasks",
+      "args": ["-n", "8", "super_super_light_async"],
+      "cwd": "${workspaceFolder}/part_b",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "lldb"
+    }
+  ]
+}

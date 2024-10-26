@@ -1,6 +1,7 @@
 #include "tasksys.h"
 #include <thread>
 #include <iostream>
+#include <sstream>
 
 IRunnable::~IRunnable() {}
 
@@ -47,20 +48,40 @@ void TaskSystemParallelThreadPoolSleeping::thread_func()
                 task = ready.front();
                 ready.pop();
                 has_task = true;
+                std::stringstream ss;
+                ss << "Thread " << std::this_thread::get_id() << " picked up task " << task.task_id << " of bulk " << task.bulk_id << "\n";
+                std::cout << ss.str();
             }
         }
 
         if (has_task)
         {
+            std::stringstream ss;
+            ss << "Thread " << std::this_thread::get_id() << " executing task " << task.task_id << " of bulk " << task.bulk_id << "\n";
+            std::cout << ss.str();
             task.runnable->runTask(task.task_id, task.num_total_tasks);
-            std::string log_message = "Executing task " + std::to_string(task.task_id) + " of bulk " + std::to_string(task.bulk_id) + "\nTotal bulks: " + std::to_string(bulks.size()) + "\n";
             Bulk &bulk = bulks[task.bulk_id];
             {
-                std::lock_guard<std::mutex> lock(bulk_mutexes[task.bulk_id]);
+                std::stringstream ss_lock;
+                ss_lock << "Thread " << std::this_thread::get_id() << " locking bulk " << task.bulk_id << "\n";
+                std::cout << ss_lock.str();
+                std::stringstream ss_size;
+                ss_size << "Size of bulk_mutexes: " << bulk_mutexes.size() << "\n";
+                std::cout << ss_size.str();
+                std::lock_guard<std::mutex> lock(*bulk_mutexes[task.bulk_id]);
+                std::stringstream ss_lock_after;
+                ss_lock_after << "Thread " << std::this_thread::get_id() << " acquired lock for bulk " << task.bulk_id << "\n";
+                std::cout << ss_lock_after.str();
                 bulk.num_finished_tasks++;
+                std::stringstream ss;
+                ss << "Bulk " << task.bulk_id << ": " << bulk.num_finished_tasks << "/" << bulk.num_total_tasks << " tasks completed\n";
+                std::cout << ss.str();
                 if (bulk.num_finished_tasks == bulk.num_total_tasks)
                 {
                     bulk.finished = true;
+                    std::stringstream ss;
+                    ss << "Bulk " << task.bulk_id << " finished";
+                    std::cout << ss.str() << std::endl;
                     bulk_finished_cv.notify_all();
                 }
             }
@@ -69,17 +90,25 @@ void TaskSystemParallelThreadPoolSleeping::thread_func()
         // check if any of the waiting bulks are now ready
         {
             std::lock_guard<std::mutex> lock(waiting_mutex);
-            for (Bulk *waiting_bulk : waiting)
+            for (auto it = waiting.begin(); it != waiting.end();)
             {
+                Bulk *waiting_bulk = *it;
                 if (bulk_is_ready(waiting_bulk))
                 {
+                    std::stringstream ss;
+                    ss << "Bulk " << waiting_bulk->bulk_id << " is now ready\n";
+                    std::cout << ss.str();
                     IRunnable *runnable = waiting_bulk->runnable;
                     int num_total_tasks = waiting_bulk->num_total_tasks;
                     for (int i = 0; i < num_total_tasks; i++)
                     {
                         ready.push(Task{runnable, i, num_total_tasks, waiting_bulk->bulk_id});
                     }
-                    waiting.erase(waiting_bulk);
+                    it = waiting.erase(it);
+                }
+                else
+                {
+                    ++it;
                 }
             }
         }
@@ -94,6 +123,7 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     // Implementations are free to add new class member variables
     // (requiring changes to tasksys.h).
     //
+    bulks = std::vector<Bulk>();
     for (int i = 0; i < num_threads; i++)
     {
         thread_pool.push_back(std::thread(&TaskSystemParallelThreadPoolSleeping::thread_func, this));
@@ -126,45 +156,42 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable *runnable, int num_tota
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable *runnable, int num_total_tasks,
                                                               const std::vector<TaskID> &deps)
 {
-    //
-    // TODO: CS149 students will implement this method in Part B.
-    //
-
     std::lock_guard<std::mutex> lock(waiting_mutex);
-    Bulk bulk{runnable, deps, num_total_tasks, 0, static_cast<int>(bulks.size()), false};
+    int bulk_id = bulks.size();
+    Bulk bulk{runnable, deps, num_total_tasks, 0, bulk_id, false};
+    bulk_mutexes.emplace_back();
     bulks.push_back(bulk);
     waiting.insert(&bulks.back());
 
-    // dependencies.push_back(std::set<int>());
-    // dependants.push_back(std::vector<int>());
-
-    // for (int dep : deps)
-    // {
-    // dependants[dep].push_back(bulk_id);
-    // dependencies[bulk_id].insert(dep);
-    // }
-
-    int bulk_id = bulks.size() - 1;
-
-    // Log the creation of a new bulk task
-    std::string log_message = "Created bulk task " + std::to_string(bulk_id) + " with " + std::to_string(num_total_tasks) + " tasks and " + std::to_string(deps.size()) + " dependencies\n";
-    std::cout << log_message << std::flush;
+    std::stringstream ss;
+    ss << "Created bulk task " << bulk_id << " with " << num_total_tasks << " tasks and " << deps.size() << " dependencies. Dependencies: ";
+    for (const auto &dep : deps)
+    {
+        ss << dep << " ";
+    }
+    ss << "\n";
+    std::cout << ss.str();
 
     return bulk_id;
 }
 
 void TaskSystemParallelThreadPoolSleeping::sync()
 {
-
-    //
-    // TODO: CS149 students will modify the implementation of this method in Part B.
-    //
-    std::cout << "Syncing" << std::endl;
+    std::stringstream ss;
+    ss << "Syncing...";
+    std::cout << ss.str() << std::endl;
     std::unique_lock<std::mutex> lock(waiting_mutex);
     bulk_finished_cv.wait(lock, [this]()
-                          { return waiting.empty() && ready.empty(); });
+                          { 
+                              bool all_done = waiting.empty() && ready.empty();
+                              std::stringstream ss;
+                              ss << "Sync check: waiting size = " << waiting.size() << ", ready size = " << ready.size() << "\n";
+                              std::cout << ss.str();
+                              return all_done; });
 
-    return;
+    std::stringstream ss2;
+    ss2 << "Sync complete";
+    std::cout << ss2.str() << std::endl;
 }
 
 /*
